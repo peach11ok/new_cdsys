@@ -91,19 +91,18 @@ const Detection: React.FC = () => {
       const uploadResult = await uploadResponse.json();
       console.log('服务器返回结果:', uploadResult);
 
-      // 构建检测结果，使用服务器返回的图片路径
+      // 构建检测结果
       const detectionResult: DetectionResult = {
+        changeDetectionImage: `http://10.16.39.70:8080${uploadResult.detection_result}`,
+        segmentationImages: {
+          image1: `http://10.16.39.70:8080${uploadResult.segmentation1}`,
+          image2: `http://10.16.39.70:8080${uploadResult.segmentation2}`
+        },
         changedAreas: ['检测到的变化区域'],
         confidence: 0.95,
         segmentationData: {
           image1: ['建筑', '道路'],
           image2: ['建筑', '绿地']
-        },
-        // 使用完整的服务器URL
-        changeDetectionImage: `http://10.16.39.70:8080${uploadResult.detection_result}`,
-        segmentationImages: {
-          image1: uploadResult.image1 ? `http://10.16.39.70:8080${uploadResult.image1}` : '',
-          image2: uploadResult.image2 ? `http://10.16.39.70:8080${uploadResult.image2}` : ''
         }
       };
 
@@ -138,8 +137,8 @@ const Detection: React.FC = () => {
         results: {
           changeDetectionImage: `http://10.16.39.70:8080${uploadResult.detection_result}`,
           segmentationImages: {
-            image1: uploadResult.image1 ? `http://10.16.39.70:8080${uploadResult.image1}` : '',
-            image2: uploadResult.image2 ? `http://10.16.39.70:8080${uploadResult.image2}` : ''
+            image1: uploadResult.image1 ? detectionResult.segmentationImages.image1 : '',
+            image2: uploadResult.image2 ? detectionResult.segmentationImages.image2 : ''
           },
           changedAreas: ['检测到的变化区域'],
           changeTypes: ['变化类型']

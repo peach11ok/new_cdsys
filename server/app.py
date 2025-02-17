@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify, send_from_directory
+from flask import Flask, request, jsonify, send_from_directory, send_file
 from flask_cors import CORS
 from werkzeug.utils import secure_filename
 import os
@@ -13,6 +13,7 @@ import torchvision
 import sys
 import cv2
 import numpy as np
+from torchvision.models.segmentation import deeplabv3_resnet50
 
 app = Flask(__name__)
 CORS(app)
@@ -33,6 +34,47 @@ MODEL_CONFIGS = {
         'weights_path': "/mnt/zt/FIFFST_server2/second_point/guass_and_kullback_leibler1/best.pth",
     }
 }
+
+# 加载 DeepLabv3 模型
+def load_deeplabv3():
+    model = deeplabv3_resnet50(pretrained=True)
+    model.eval()
+    if torch.cuda.is_available():
+        model = model.cuda()
+    return model
+
+# 初始化模型
+deeplabv3_model = load_deeplabv3()
+
+# 语义分割的类别映射
+CLASSES = [
+    'background', 'aeroplane', 'bicycle', 'bird', 'boat', 'bottle', 'bus',
+    'car', 'cat', 'chair', 'cow', 'diningtable', 'dog', 'horse', 'motorbike',
+    'person', 'pottedplant', 'sheep', 'sofa', 'train', 'tvmonitor'
+]
+
+# 图像预处理
+def preprocess_image(image_path):
+    transform = transforms.Compose([
+        transforms.Resize((520, 520)),
+        transforms.ToTensor(),
+        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+    ])
+    image = Image.open(image_path).convert('RGB')
+    input_tensor = transform(image)
+    input_batch = input_tensor.unsqueeze(0)
+    if torch.cuda.is_available():
+        input_batch = input_batch.cuda()
+    return input_batch
+
+# 处理分割结果
+def process_segmentation(output):
+    output_predictions = output['out'][0].argmax(0).cpu().numpy()
+    # 创建彩色分割图
+    color_map = np.random.randint(0, 255, (len(CLASSES), 3), dtype=np.uint8)
+    color_map[0] = [0, 0, 0]  # 背景设为黑色
+    segmentation_map = color_map[output_predictions]
+    return Image.fromarray(segmentation_map)
 
 def get_model(model_name):
     """根据模型名称获取对应的模型实例"""
@@ -178,6 +220,37 @@ def upload_images():
                 result[key] = f"/uploads/{new_filename}"
                 print(f"图片{key}已保存，路径: {filepath}")
         
+        # 进行语义分割
+        with torch.no_grad():
+            # 处理第一张图片
+            input1 = preprocess_image(os.path.join(UPLOAD_FOLDER, secure_filename(f"{os.path.splitext(image1.filename)[0]}_t1{os.path.splitext(image1.filename)[1]}")))
+            output1 = deeplabv3_model(input1)
+            seg_result1 = process_segmentation(output1)
+            
+            # 处理第二张图片
+            input2 = preprocess_image(os.path.join(UPLOAD_FOLDER, secure_filename(f"{os.path.splitext(image2.filename)[0]}_t2{os.path.splitext(image2.filename)[1]}")))
+            output2 = deeplabv3_model(input2)
+            seg_result2 = process_segmentation(output2)
+        
+        # 使用时间戳保存分割结果
+        results_folder = 'results'
+        os.makedirs(results_folder, exist_ok=True)
+        
+        seg1_path = os.path.join(results_folder, f'segmentation1_{timestamp}.png')
+        seg2_path = os.path.join(results_folder, f'segmentation2_{timestamp}.png')
+        
+        seg_result1.save(seg1_path)
+        seg_result2.save(seg2_path)
+        
+        # 在返回结果中添加分割结果的路径
+        result.update({
+            'image1': f"/uploads/{secure_filename(f'{os.path.splitext(image1.filename)[0]}_t1{os.path.splitext(image1.filename)[1]}')}",
+            'image2': f"/uploads/{secure_filename(f'{os.path.splitext(image2.filename)[0]}_t2{os.path.splitext(image2.filename)[1]}')}",
+            'detection_result': f"/outputs/detection_{timestamp}.png",
+            'segmentation1': f"/results/segmentation1_{timestamp}.png",
+            'segmentation2': f"/results/segmentation2_{timestamp}.png"
+        })
+        
         # 执行变化检测
         detection_result = detect_changes(
             os.path.join(UPLOAD_FOLDER, secure_filename(f"{os.path.splitext(image1.filename)[0]}_t1{os.path.splitext(image1.filename)[1]}")),
@@ -204,6 +277,10 @@ def uploaded_file(filename):
 @app.route('/outputs/<filename>')
 def output_file(filename):
     return send_from_directory(OUTPUT_FOLDER, filename)
+
+@app.route('/results/<path:filename>')
+def get_result(filename):
+    return send_file(f'results/{filename}')
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=8080)

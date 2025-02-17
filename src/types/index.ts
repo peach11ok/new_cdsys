@@ -29,16 +29,16 @@ export interface DetectionRecord {
 }
 
 export interface DetectionResult {
+  changeDetectionImage: string;
+  segmentationImages: {
+    image1: string;
+    image2: string;
+  };
   changedAreas: string[];
   confidence: number;
   segmentationData: {
     image1: string[];
     image2: string[];
-  };
-  changeDetectionImage: string;
-  segmentationImages: {
-    image1: string;
-    image2: string;
   };
 }
 

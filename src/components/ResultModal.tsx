@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { DetectionResult, DetectionRecord, StoredUser } from '../types';
 
@@ -20,6 +20,13 @@ const ResultModal: React.FC<Props> = ({ isOpen, onClose, result, selectedImages,
   const { user } = useAuth();
   const [isGeneratingReport, setIsGeneratingReport] = useState(false);
   const [reportGenerated, setReportGenerated] = useState(false);
+
+  useEffect(() => {
+    console.log('ResultModal result:', result);
+    if (result?.segmentationImages) {
+      console.log('Segmentation Images:', result.segmentationImages);
+    }
+  }, [result]);
 
   const handleGenerateReport = async () => {
     if (!user || !result || !selectedImages || !selectedModels) return;
@@ -205,7 +212,7 @@ const ResultModal: React.FC<Props> = ({ isOpen, onClose, result, selectedImages,
               <h4 className="text-base font-medium mb-2">图片1的语义类别</h4>
               <div className="bg-gray-50 p-4 rounded-lg flex justify-center">
                 <img 
-                  src={result.segmentationImages.image1} 
+                  src={result.segmentationImages.image1}
                   alt="图片1的语义类别" 
                   className="max-w-full h-auto object-contain max-h-[300px]"
                 />
@@ -215,7 +222,7 @@ const ResultModal: React.FC<Props> = ({ isOpen, onClose, result, selectedImages,
               <h4 className="text-base font-medium mb-2">图片2的语义类别</h4>
               <div className="bg-gray-50 p-4 rounded-lg flex justify-center">
                 <img 
-                  src={result.segmentationImages.image2} 
+                  src={result.segmentationImages.image2}
                   alt="图片2的语义类别" 
                   className="max-w-full h-auto object-contain max-h-[300px]"
                 />
